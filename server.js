@@ -18,6 +18,9 @@ const io = socketIo(server);
 // In-memory replacement for an actual db based session storage (like redis)
 const sessionStorage = {};
 
+/*
+  Generates a unique token to identify sessions
+*/
 app.get('/generate-token', (req, res) => {
   const token = uuidv1();
   sessionStorage[token] = {};
@@ -29,7 +32,7 @@ app.get('/generate-token', (req, res) => {
 io.on('connection', socket => {
   socket.on('HandshakeFromUser', data => {
     if (!data.token) {
-      // todo: return error - client tried to send a request without a token!
+      return error(`Missing token`);
     }
 
     // this can only happen if the session storage is lost due to a server restart
@@ -40,45 +43,46 @@ io.on('connection', socket => {
     const session = sessionStorage[data.token];
     if (session.userName) {
       send(socket, [
-        content.nice_to_see_you_again(session.userName),
+        content.repeat_greeting(session.userName),
         content.list_math_expression
       ]);
     } else {
-      send(socket, [content.hi_im_maya, content.tell_me_your_name]);
+      send(socket, [content.introduction, content.name_prompt]);
     }
   });
 
   socket.on('MessageFromUser', data => {
     if (!data.token) {
-      // return error - client tried to send a request without a token!
-      return;
+      return error(`Missing token`);
     }
 
     var session = sessionStorage[data.token];
     if (!session) {
-      //return error - client tried to open socket, but can't find their session!
-      return;
+      return error(`Session not found`);
     }
 
     if (session.userName) {
       try {
         const num = math.eval(data.content.toLowerCase());
-        send(socket, [num.toString(), content.that_was_easy]);
+        send(socket, [num.toString(), content.success_response]);
       } catch(e) {
-        send(socket, [content.sorry]);
+        send(socket, [content.failure_response]);
       }
     } else {
       const firstName = data.content.split(' ')[0];
       session.userName = firstName;
       send(socket, [
-        content.nice_to_meet_you(firstName),
-        content.this_is_how,
+        content.first_greeting(firstName),
+        content.explanation_prompt,
         content.list_math_expression
       ]);
     }
   });
 });
 
+/*
+  Sends a list of messages one by one, simulates typing
+*/
 function send(socket, messages) {
   let i = 0;
   const interval = setInterval(() => {
@@ -92,6 +96,10 @@ function send(socket, messages) {
       clearInterval(interval);
     }
   }, MESSAGE_TIMEOUT);
+}
+
+function error(message) {
+  socket.emit('Error', { message });
 }
 
 server.listen(API_PORT, () => console.log(`Listening on port ${API_PORT}`));
