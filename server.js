@@ -1,16 +1,16 @@
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const math = require('mathjs');
-const cors = require('cors');
-const uuidv1 = require('uuid/v1');
-const content = require('./content');
+const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
+const math = require("mathjs");
+const cors = require("cors");
+const uuidv1 = require("uuid/v1");
+const content = require("./content");
 
 const API_PORT = 3001;
 const MESSAGE_TIMEOUT = 1000;
 
 const app = express();
-app.use(cors({ origin: 'http://localhost:3000' }))
+app.use(cors({ origin: "http://localhost:3000" }));
 
 const server = http.Server(app);
 const io = socketIo(server);
@@ -21,16 +21,15 @@ const sessionStorage = {};
 /*
   Generates a unique token to identify sessions
 */
-app.get('/generate-token', (req, res) => {
+app.get("/generate-token", (req, res) => {
   const token = uuidv1();
   sessionStorage[token] = {};
 
   res.send({ token });
 });
 
-
-io.on('connection', socket => {
-  socket.on('HandshakeFromUser', data => {
+io.on("connection", socket => {
+  socket.on("HandshakeFromUser", data => {
     if (!data.token) {
       return error(`Missing token`);
     }
@@ -51,7 +50,7 @@ io.on('connection', socket => {
     }
   });
 
-  socket.on('MessageFromUser', data => {
+  socket.on("MessageFromUser", data => {
     if (!data.token) {
       return error(`Missing token`);
     }
@@ -65,11 +64,11 @@ io.on('connection', socket => {
       try {
         const num = math.eval(data.content.toLowerCase());
         send(socket, [num.toString(), content.success_response]);
-      } catch(e) {
+      } catch (e) {
         send(socket, [content.failure_response]);
       }
     } else {
-      const firstName = data.content.split(' ')[0];
+      const firstName = data.content.split(" ")[0];
       session.userName = firstName;
       send(socket, [
         content.first_greeting(firstName),
@@ -87,9 +86,9 @@ function send(socket, messages) {
   let i = 0;
   const interval = setInterval(() => {
     if (i < messages.length) {
-      socket.emit('MessageFromBot', { typing: true });
+      socket.emit("MessageFromBot", { isTyping: true });
       setTimeout(() => {
-        socket.emit('MessageFromBot', { text: messages[i] });
+        socket.emit("MessageFromBot", { text: messages[i] });
         i++;
       }, MESSAGE_TIMEOUT);
     } else {
@@ -99,7 +98,7 @@ function send(socket, messages) {
 }
 
 function error(message) {
-  socket.emit('Error', { message });
+  socket.emit("Error", { message });
 }
 
 server.listen(API_PORT, () => console.log(`Listening on port ${API_PORT}`));
